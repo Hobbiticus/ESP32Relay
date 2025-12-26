@@ -96,7 +96,7 @@ void CheckSerial()
 
         //not sure why this was happening, but this could not connect repeatedly even though everything
         //should have been working fine.  Log is below.  I'm guessing the device got booted from wifi, and
-        //hoping that doing the block below will detect this condition and migigate it.
+        //hoping that doing the block below will detect this condition and mitigate it.
         //12:30:42.195 -> Got message len = 21, type = 0
         //12:30:42.195 -> f8 ea 7d 6f 15 00 00 00 e0 5a 1b a8 a9 08 00 c0 a8 01 de 61 1e 
         //12:30:42.195 -> Connecting to 192.168.1.222:7777...
@@ -104,20 +104,37 @@ void CheckSerial()
         if (WiFi.status() != WL_CONNECTED)
         {
           digitalWrite(2, LOW);
-          Serial.printf("Hmm, we're not connected - let's try connecting\n");
-          WiFi.begin(MY_SSID, MY_WIFI_PASSWORD);
-          while (WiFi.status() != WL_CONNECTED)
+          Serial.printf("Hmm, we're not connected, status = %d - let's try connecting\n", WiFi.status());
+          unsigned long startTime = millis();
+          WiFi.disconnect();
+          WiFi.begin();
+          bool on = true;
+          while (WiFi.status() != WL_CONNECTED && millis() - startTime < 1000 * 30)
           {
+            if (on)
+              digitalWrite(2, HIGH);
+            else
+              digitalWrite(2, LOW);
+            on = !on;
             delay(100);
-            Serial.println("Waiting for wifi to connect...");
+            Serial.printf("Waiting for wifi to connect... status = %d\n", WiFi.status());
           }
-          Serial.println("Connected to WiFi!");
-          digitalWrite(2, HIGH);
+
+          if (WiFi.status() == WL_CONNECTED)
+          {
+            Serial.println("Connected to WiFi!");
+            digitalWrite(2, HIGH);
+          }
+          else
+          {
+            Serial.println("Gave up waiting for WiFi to connect\n");
+            digitalWrite(2, LOW);
+          }
         }
 
         if (!sock->connect(ip, msg->m_Port))
         {
-          //TODO: send response that went badly
+          //send response that went badly
           out.m_Msg.m_Socket = -1;
           WriteToSerial((uint8_t*)&out, sizeof(out), SerialLink);
           delete sock;
